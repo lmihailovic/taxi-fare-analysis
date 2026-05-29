@@ -1,15 +1,29 @@
+import org.apache.spark.sql.SparkSession
 
-//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
-@main
-def main(): Unit = {
-  //TIP Press <shortcut actionId="ShowIntentionActions"/> with your caret at the highlighted text
-  // to see how IntelliJ IDEA suggests fixing it.
-  (1 to 5).map(println)
+object Main {
+  def main(args: Array[String]): Unit = {
 
-  for (i <- 1 to 5) {
-    //TIP Press <shortcut actionId="Debug"/> to start debugging your code. We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
-    // for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.
-    println(s"i = $i")
+    println(System.getProperty("java.version"))
+    println(System.getProperty("java.home"))
+
+    query1()
+  }
+
+  private def query1(): Unit = {
+    val spark = SparkSession.builder().
+      appName("Taxi Zone Lookup")
+      .master("local[*]")
+      .getOrCreate()
+
+    val zoneLookup = spark.read
+      .option("header", "true")
+      .option("inferSchema", "true")
+      .csv("data/taxi_zone_lookup.csv")
+
+    val tripData = spark.read
+      .parquet("data/yellow_tripdata_2024-01.parquet")
+
+    println("Trip Data: " + tripData.count() + " rows")
+    println("Zone Lookup: " + zoneLookup.count() + " rows")
   }
 }
-
