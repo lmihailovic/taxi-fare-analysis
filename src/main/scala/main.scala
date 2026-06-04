@@ -1,4 +1,5 @@
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.{SparkConf, SparkContext}
 
 object Main {
   def main(args: Array[String]): Unit = {
@@ -6,24 +7,30 @@ object Main {
     println(System.getProperty("java.version"))
     println(System.getProperty("java.home"))
 
-    query1()
-  }
+    val sparkConf = new SparkConf()
+      .set("spark.serializer", "org.apache.spark.serializer.JavaSerializer")
 
-  private def query1(): Unit = {
     val spark = SparkSession.builder().
       appName("Taxi Zone Lookup")
       .master("local[*]")
+      .config(sparkConf)
       .getOrCreate()
 
-    val zoneLookup = spark.read
-      .option("header", "true")
-      .option("inferSchema", "true")
-      .csv("data/taxi_zone_lookup.csv")
+    spark.sparkContext.setLogLevel("WARN")
 
-    val tripData = spark.read
-      .parquet("data/yellow_tripdata_2024-01.parquet")
+    val sparkContext = spark.sparkContext
 
-    println("Trip Data: " + tripData.count() + " rows")
-    println("Zone Lookup: " + zoneLookup.count() + " rows")
+    query1(spark, sparkContext)
+  }
+
+  private def query1(sparkSession: SparkSession, sparkContext: SparkContext): Unit = {
+
+    val zoneLookup = sparkContext.textFile("data/taxi_zone_lookup.csv", 10)
+    // heuristikom se doslo do broja 10
+
+    println(zoneLookup.count())
+
+    val jedinstveneVoznje = zoneLookup.distinct()
+    println(jedinstveneVoznje.count())
   }
 }

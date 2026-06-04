@@ -3,7 +3,7 @@
     <option name="ALTERNATIVE_JRE_PATH" value="17" />
     <option name="MAIN_CLASS_NAME" value="Main" />
     <module name="DS-Klk2-Spark-Scala" />
-    <option name="VM_PARAMETERS" value="--add-exports=java.base/sun.nio.ch=ALL-UNNAMED" />
+    <option name="VM_PARAMETERS" value="--add-exports=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED " />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>
