@@ -1,4 +1,7 @@
+import com.sun.org.apache.xalan.internal.lib.ExsltDatetime.year
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.dsl.expressions.StringToAttributeConversionHelper
+import org.apache.spark.sql.functions.{lit, to_date}
 import org.apache.spark.{SparkConf, SparkContext}
 
 object Main {
@@ -21,6 +24,10 @@ object Main {
     val sparkContext = spark.sparkContext
 
     query1(spark, sparkContext)
+
+    println("====================")
+
+    query2(spark, sparkContext)
   }
 
   private def query1(sparkSession: SparkSession, sparkContext: SparkContext): Unit = {
@@ -38,5 +45,48 @@ object Main {
       .sortBy(_._2, ascending = false)
 
     result.take(10).foreach(println)
+  }
+
+  private def query2(sparkSession: SparkSession, sparkContext: SparkContext): Unit = {
+    import org.apache.spark.sql.functions.col
+    import sparkSession.implicits._
+    import org.apache.spark.sql.functions.{col, year}
+    import org.apache.spark.sql.functions.count
+
+
+    val tripdataDF = sparkSession.read.parquet("data/yellow_tripdata_2024-01.parquet")
+    val zoneDF = sparkSession.read
+      .option("header", "true")
+      .csv("data/taxi_zone_lookup.csv")
+
+    val airportZones = zoneDF
+      .filter(col("Zone").isin("JFK Airport", "LaGuardia Airport", "Newark Airport"))
+      .select(col("LocationID").cast("int").as("airport_id"))
+
+    val airportIDs = airportZones
+      .collect()
+      .map(_.getAs[Int]("airport_id"))
+
+    val result = tripdataDF
+      .filter(
+        col("DOLocationID").isin(airportIDs: _*)
+      )
+      .filter(  // samo voznje iz 2024. godine, kao u mejlu naglaseno
+        year(col("tpep_pickup_datetime")) === 2024
+      )
+      .groupBy(col("PULocationID"))
+      .count()
+      .join(
+        zoneDF.select(
+          col("LocationID").cast("int").as("LocationID"),
+          col("Zone"),
+          col("Borough")
+        ),
+        col("PULocationID") === col("LocationID")
+      )
+      .select(col("Zone"), col("Borough"), col("count").cast("int").as("Ukupno Vožnji"))
+      .orderBy(col("Ukupno Vožnji").desc)
+
+    result.show()
   }
 }
