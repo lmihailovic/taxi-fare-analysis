@@ -1,4 +1,3 @@
-import com.sun.org.apache.xalan.internal.lib.ExsltDatetime.year
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.dsl.expressions.StringToAttributeConversionHelper
 import org.apache.spark.sql.functions.{lit, to_date}
@@ -32,6 +31,10 @@ object Main {
     println("***************************")
 
     query3(spark, sparkContext)
+
+    println("***************************")
+
+    query4(spark, sparkContext)
 
   }
 
@@ -132,5 +135,49 @@ object Main {
       .orderBy(col("Datum"))
 
       result.show(30)
+  }
+
+  private def query4(sparkSession: SparkSession, sparkContext: SparkContext): Unit = {
+    import org.apache.spark.sql.functions._
+    import org.apache.spark.sql.expressions.Window
+
+    val tripdataDF = sparkSession.read.parquet("data/yellow_tripdata_2024-01.parquet")
+    val zoneDF = sparkSession.read
+      .option("header", "true")
+      .csv("data/taxi_zone_lookup.csv")
+
+    val morningFares = tripdataDF
+      .filter(  // samo voznje iz 2024. godine, kao u mejlu naglaseno
+        year(col("tpep_pickup_datetime")) === 2024
+      )
+      .filter(hour(col("tpep_pickup_datetime")).between(9, 11))
+      .withColumn("pickup_ts", unix_timestamp(col("tpep_pickup_datetime")))
+
+    val faresByZone = Window
+      .partitionBy("PULocationID")
+      .orderBy(col("pickup_ts"))
+
+    val faresByZoneWithPause =morningFares
+      .withColumn("prev_pickup_ts", lag(col("pickup_ts"), 1).over(faresByZone))
+      .withColumn("pauza", col("pickup_ts") - col("prev_pickup_ts"))
+      .filter(col("pauza").isNotNull && col("pauza") > 0)
+
+    val result = faresByZoneWithPause
+      .groupBy(col("PULocationID"))
+      .agg(avg(col("pauza")).as("Prosečna Pauza Sec"))
+      .join(
+        zoneDF.select(
+          col("LocationID").cast("int").as("LocationID"),
+          col("Zone"),
+          col("Borough")
+        ),
+        col("PULocationID") === col("LocationID")
+      )
+      .select(col("Zone"), col("Borough"), col("Prosečna Pauza Sec"))
+      .orderBy(col("Prosečna Pauza Sec").asc)
+
+    val resultTwoDecimal = result.withColumn("Prosečna Pauza Sec" ,round(col("Prosečna Pauza Sec"), 2))
+
+    resultTwoDecimal.show(10)
   }
 }
