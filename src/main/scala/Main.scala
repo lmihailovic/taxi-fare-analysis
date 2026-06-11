@@ -25,12 +25,18 @@ object Main {
 
   private def query1(sparkSession: SparkSession, sparkContext: SparkContext): Unit = {
 
-    val zoneLookup = sparkContext.textFile("data/taxi_zone_lookup.csv", 10)
-    // heuristikom se doslo do broja 10
+    val tripdataDF = sparkSession.read.parquet("data/yellow_tripdata_2024-01.parquet")
+    val tripdataRDD = tripdataDF.rdd
 
-    println(zoneLookup.count())
+    val result = tripdataRDD
+      .map(row => (
+        (row.getAs[Int]("PULocationID"), row.getAs[Int]("DOLocationID")),
+        (row.getAs[Double]("total_amount"), 1)
+      ))
+      .reduceByKey((a, b) => (a._1 + b._1, a._2 + b._2))
+      .mapValues { case (total, count) => total / count }
+      .sortBy(_._2, ascending = false)
 
-    val jedinstveneVoznje = zoneLookup.distinct()
-    println(jedinstveneVoznje.count())
+    result.take(10).foreach(println)
   }
 }
