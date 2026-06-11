@@ -25,9 +25,14 @@ object Main {
 
     query1(spark, sparkContext)
 
-    println("====================")
+    println("***************************")
 
     query2(spark, sparkContext)
+
+    println("***************************")
+
+    query3(spark, sparkContext)
+
   }
 
   private def query1(sparkSession: SparkSession, sparkContext: SparkContext): Unit = {
@@ -88,5 +93,44 @@ object Main {
       .orderBy(col("Ukupno Vožnji").desc)
 
     result.show()
+  }
+
+  private def query3(sparkSession: SparkSession, sparkContext: SparkContext): Unit = {
+    import sparkSession.implicits._
+    import org.apache.spark.sql.functions._
+    import org.apache.spark.sql.expressions.Window
+    import org.apache.spark.sql.functions.{col, year}
+
+    val tripdataDF = sparkSession.read.parquet("data/yellow_tripdata_2024-01.parquet")
+    val zoneDF = sparkSession.read
+      .option("header", "true")
+      .csv("data/taxi_zone_lookup.csv")
+
+    val dayZoneAvg = tripdataDF
+      .withColumn("Datum", to_date(col("tpep_pickup_datetime")))
+      .groupBy(col("Datum"), col("PULocationID"))
+      .agg(avg(col("trip_distance")).as("Prosečna Dužina Vožnje"))
+
+    val windowSpec = Window.partitionBy("Datum").orderBy(col("Prosečna Dužina Vožnje").desc)
+
+    val result = dayZoneAvg
+      .filter(  // samo voznje iz 2024. godine, kao u mejlu naglaseno
+        year(col("Datum")) === 2024
+      )
+      .withColumn("rank", rank().over(windowSpec))
+      .filter(col("rank") === 1)
+      .drop("rank")
+      .join(
+        zoneDF.select(
+          col("LocationID").cast("int").as("LocationID"),
+          col("Zone"),
+          col("Borough")
+        ),
+        col("PULocationID") === col("LocationID")
+      )
+      .select(col("Zone"), col("Borough"), col("Datum"), col("Prosečna Dužina Vožnje"))
+      .orderBy(col("Datum"))
+
+      result.show(30)
   }
 }
