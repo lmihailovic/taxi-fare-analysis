@@ -52,7 +52,7 @@ object Main {
       .mapValues { case (total, count) => total / count }
       .sortBy(_._2, ascending = false)
 
-    result.take(10).foreach(println)
+    result.take(20).foreach(println)
   }
 
   private def query2(sparkSession: SparkSession, sparkContext: SparkContext): Unit = {
@@ -95,7 +95,7 @@ object Main {
       .select(col("Zone"), col("Borough"), col("count").cast("int").as("Ukupno Vožnji"))
       .orderBy(col("Ukupno Vožnji").desc)
 
-    result.show()
+    result.show(20)
   }
 
   private def query3(sparkSession: SparkSession, sparkContext: SparkContext): Unit = {
@@ -134,7 +134,7 @@ object Main {
       .select(col("Zone"), col("Borough"), col("Datum"), col("Prosečna Dužina Vožnje"))
       .orderBy(col("Datum"))
 
-      result.show(30)
+      result.show(20)
   }
 
   private def query4(sparkSession: SparkSession, sparkContext: SparkContext): Unit = {
@@ -178,6 +178,6 @@ object Main {
 
     val resultTwoDecimal = result.withColumn("Prosečna Pauza Sec" ,round(col("Prosečna Pauza Sec"), 2))
 
-    resultTwoDecimal.show(10)
+    resultTwoDecimal.show(20)
   }
 }
